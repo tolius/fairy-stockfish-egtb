@@ -10,7 +10,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(ARCH_FLAGS)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -arch:${ARCH_FLAGS}")
+	if (WIN32)
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -arch:${ARCH_FLAGS}")
+	else()
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+	endif()
 endif()
 
 include_directories(
@@ -59,32 +63,37 @@ set(EGTB_SRC
 )
 SOURCE_GROUP ("EGTB" FILES ${EGTB_SRC})
 
-#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:4194304")
-
 add_executable(${PROJECT_NAME}
 	${APP_SRC}
 	${EGTB_SRC}
 )
 
 target_compile_definitions(${PROJECT_NAME}
-#	PRIVATE PRECOMPUTED_MAGICS
 	PRIVATE USE_POPCNT
 	PRIVATE USE_PEXT
 	PRIVATE USE_FAIRY_SF
+	PRIVATE NNUE_EMBEDDING_OFF
 )
 if(IS_SOLVER)
-target_compile_definitions(${PROJECT_NAME}
-	PRIVATE IS_SOLVER
-)
+	target_compile_definitions(${PROJECT_NAME}
+		PRIVATE IS_SOLVER
+	)
 endif()
 
-target_link_libraries(${PROJECT_NAME}
-	$<TARGET_OBJECTS:dictzip>
-)
+if (WIN32)
+	target_link_libraries(${PROJECT_NAME}
+		$<TARGET_OBJECTS:dictzip>
+	)
+else()
+	find_package(Threads REQUIRED)
+	target_link_libraries(${PROJECT_NAME}
+		$<TARGET_OBJECTS:dictzip>
+		Threads::Threads
+		-lstdc++fs
+	)
+endif()
 
-#set_target_properties(${PROJECT_NAME} PROPERTIES )
-
-if(ARCH_FLAGS)
+if(WIN32 AND ARCH_FLAGS)
 	string(TOLOWER ${ARCH_FLAGS} suff_arch)
 	set(suff_arch "_${suff_arch}")
 else()
@@ -99,10 +108,11 @@ endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
 	OUTPUT_NAME "${PROJECT_NAME}${suff_arch}${suff_solver}"
-#	LINKER_LANGUAGE CXX
 )
 
-target_compile_options(${PROJECT_NAME}
-	PRIVATE "/Ox"
-	PRIVATE "/GL"
-)
+if (WIN32)
+	target_compile_options(${PROJECT_NAME}
+		PRIVATE "/Ox"
+		PRIVATE "/GL"
+	)
+endif()
