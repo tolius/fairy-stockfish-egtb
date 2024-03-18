@@ -85,6 +85,9 @@ if (WIN32)
 		$<TARGET_OBJECTS:dictzip>
 	)
 else()
+	target_compile_definitions(${PROJECT_NAME}
+		PRIVATE NDEBUG
+	)
 	find_package(Threads REQUIRED)
 	target_link_libraries(${PROJECT_NAME}
 		$<TARGET_OBJECTS:dictzip>
@@ -114,5 +117,11 @@ if (WIN32)
 	target_compile_options(${PROJECT_NAME}
 		PRIVATE "/Ox"
 		PRIVATE "/GL"
+	)
+else()
+	target_compile_options(${PROJECT_NAME}
+		PRIVATE "-Ofast"
+		PRIVATE "-flto"
+		PRIVATE "-march=native"
 	)
 endif()

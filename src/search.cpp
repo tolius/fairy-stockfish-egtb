@@ -346,8 +346,6 @@ void Thread::search() {
 
   if (mainThread)
   {
-      if (Limits.mate)
-          alpha = (VALUE_MATE - Limits.mate * 2);
       if (mainThread->bestPreviousScore == VALUE_INFINITE)
           for (int i = 0; i < 4; ++i)
               mainThread->iterValue[i] = VALUE_ZERO;
