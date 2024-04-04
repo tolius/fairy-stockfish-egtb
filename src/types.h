@@ -69,6 +69,9 @@
 #  include <intrin.h> // Microsoft header for _BitScanForward64()
 #  define IS_64BIT
 #endif
+#if __x86_64__
+#  define IS_64BIT
+#endif
 
 #if defined(USE_POPCNT) && (defined(__INTEL_COMPILER) || defined(_MSC_VER))
 #  include <nmmintrin.h> // Intel and Microsoft header for _mm_popcnt_u64()
