@@ -1,6 +1,11 @@
 cmake_minimum_required (VERSION 3.13.0)
 
-set(ARCH_FLAGS "AVX2") # BMI2 AVX2 AVX512
+if (WIN32)
+	set(ARCH_FLAGS "AVX2") # BMI2 AVX2 AVX512
+else()
+	set(ARCH_FLAGS "native")
+endif()
+
 set(IS_SOLVER ON)
 
 add_subdirectory(src/egtb/dictzip)
@@ -13,7 +18,7 @@ if(ARCH_FLAGS)
 	if (WIN32)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -arch:${ARCH_FLAGS}")
 	else()
-		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=${ARCH_FLAGS}")
 	endif()
 endif()
 
@@ -73,6 +78,7 @@ target_compile_definitions(${PROJECT_NAME}
 	PRIVATE USE_PEXT
 	PRIVATE USE_FAIRY_SF
 	PRIVATE NNUE_EMBEDDING_OFF
+	PRIVATE UCI_INFO_OUTPUT
 )
 if(IS_SOLVER)
 	target_compile_definitions(${PROJECT_NAME}
