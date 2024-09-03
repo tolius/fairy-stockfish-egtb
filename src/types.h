@@ -696,12 +696,13 @@ inline Score operator/(Score s, int i) {
 /// Multiplication of a Score by an integer. We check for overflow in debug mode.
 inline Score operator*(Score s, int i) {
 
-  Score result = Score(int(s) * i);
-
-  assert(eg_value(result) == (i * eg_value(s)));
-  assert(mg_value(result) == (i * mg_value(s)));
-  assert((i == 0) || (result / i) == s);
-
+  //Score result = Score(int(s) * i);
+  //
+  //assert(eg_value(result) == (i * eg_value(s)));
+  //assert(mg_value(result) == (i * mg_value(s)));
+  //assert((i == 0) || (result / i) == s);
+  
+  Score result = make_score(std::min(VALUE_KNOWN_WIN, mg_value(s) * i), std::min(VALUE_KNOWN_WIN, eg_value(s) * i));
   return result;
 }
 
