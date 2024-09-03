@@ -29,7 +29,7 @@ PieceMap pieceMap; // Global object
 
 
 namespace {
-  std::map<char, std::vector<std::pair<int, int>>> leaperAtoms = {
+  const std::map<char, std::vector<std::pair<int, int>>> leaperAtoms = {
       {'W', {std::make_pair(1, 0)}},
       {'F', {std::make_pair(1, 1)}},
       {'D', {std::make_pair(2, 0)}},
@@ -43,7 +43,7 @@ namespace {
       {'G', {std::make_pair(3, 3)}},
       {'K', {std::make_pair(1, 0), std::make_pair(1, 1)}},
   };
-  std::map<char, std::vector<std::pair<int, int>>> riderAtoms = {
+  const std::map<char, std::vector<std::pair<int, int>>> riderAtoms = {
       {'R', {std::make_pair(1, 0)}},
       {'B', {std::make_pair(1, 1)}},
       {'Q', {std::make_pair(1, 0), std::make_pair(1, 1)}},
@@ -60,6 +60,7 @@ namespace {
       bool hopper = false;
       bool rider = false;
       bool lame = false;
+      bool initial = false;
       int distance = 0;
       std::vector<std::string> prelimDirections = {};
       for (std::string::size_type i = 0; i < betza.size(); i++)
@@ -79,6 +80,9 @@ namespace {
           // Lame leaper
           else if (c == 'n')
               lame = true;
+          // Initial move
+          else if (c == 'i')
+              initial = true;
           // Directional modifiers
           else if (verticals.find(c) != std::string::npos || horizontals.find(c) != std::string::npos)
           {
@@ -138,9 +142,9 @@ namespace {
                   // Add moves
                   for (auto modality : moveModalities)
                   {
-                      auto& v = hopper ? p->hopper[modality]
-                               : rider ? p->slider[modality]
-                                       : p->steps[modality];
+                      auto& v = hopper ? p->hopper[initial][modality]
+                               : rider ? p->slider[initial][modality]
+                                       : p->steps[initial][modality];
                       auto has_dir = [&](std::string s) {
                         return std::find(directions.begin(), directions.end(), s) != directions.end();
                       };
@@ -148,9 +152,9 @@ namespace {
                           v[Direction(atom.first * FILE_NB + atom.second)] = distance;
                       if (directions.size() == 0 || has_dir("bb") || has_dir("vv") || has_dir("lb") || has_dir("lv") || has_dir("bh") || has_dir("lh") || has_dir("hr"))
                           v[Direction(-atom.first * FILE_NB - atom.second)] = distance;
-                      if (directions.size() == 0 || has_dir("rr") || has_dir("ss") || has_dir("br") || has_dir("bs") || has_dir("bh") || has_dir("lh") || has_dir("hr"))
+                      if (directions.size() == 0 || has_dir("rr") || has_dir("ss") || has_dir("br") || has_dir("bs") || has_dir("bh") || has_dir("rh") || has_dir("hr"))
                           v[Direction(-atom.second * FILE_NB + atom.first)] = distance;
-                      if (directions.size() == 0 || has_dir("ll") || has_dir("ss") || has_dir("fl") || has_dir("fs") || has_dir("fh") || has_dir("rh") || has_dir("hr"))
+                      if (directions.size() == 0 || has_dir("ll") || has_dir("ss") || has_dir("fl") || has_dir("fs") || has_dir("fh") || has_dir("lh") || has_dir("hr"))
                           v[Direction(atom.second * FILE_NB - atom.first)] = distance;
                       if (directions.size() == 0 || has_dir("rr") || has_dir("ss") || has_dir("fr") || has_dir("fs") || has_dir("fh") || has_dir("rh") || has_dir("hl"))
                           v[Direction(atom.second * FILE_NB + atom.first)] = distance;
@@ -167,6 +171,9 @@ namespace {
               prelimDirections.clear();
               hopper = false;
               rider = false;
+              lame = false;
+              initial = false;
+              distance = 0;
           }
       }
       return p;
@@ -174,7 +181,7 @@ namespace {
   // Special multi-leg betza description for Janggi elephant
   PieceInfo* janggi_elephant_piece() {
       PieceInfo* p = from_betza("nZ", "janggiElephant");
-      p->betza = "mafsmafW"; // for compatiblity with XBoard/Winboard
+      p->betza = "mafsmafW"; // for compatibility with XBoard/Winboard
       return p;
   }
 }

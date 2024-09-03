@@ -183,8 +183,11 @@ tuple<size_t, bool> TB_Reader::board_to_index(const Position& board) const
 size_t TB_Reader::board_to_key(const Position& board, bool is_ep) const
 {
 	size_t key = tbtable->get_idx(board);
-	if (is_ep)
-		key += size2 * board.ep_square();
+	if (is_ep) {
+		auto ep_squares = board.ep_squares();
+		assert(ep_squares);
+		key += size2 * pop_lsb(ep_squares);
+	}
 	return key;
 }
 

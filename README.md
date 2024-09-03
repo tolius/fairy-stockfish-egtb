@@ -1,6 +1,6 @@
 # Fairy-Stockfish + Antichess DTW EGTB
 
-This version is a [clone](https://github.com/fairy-stockfish/Fairy-Stockfish/tree/104d2f40e4d064815d6b06d0c812aec3b7b01f20) of the original program with added ability to work with antichess endgame tablebases with DTW (Depth To Win) metric.
+This version is a [clone](https://github.com/fairy-stockfish/Fairy-Stockfish/tree/f474f12af3786a98393227e0b4b335434c5b8880) of the original program with added ability to work with antichess endgame tablebases with DTW (Depth To Win) metric.
 The program is intended to be used as an engine for [Solver](https://github.com/tolius/solver).
 Original code and other information is available [here](https://github.com/fairy-stockfish/Fairy-Stockfish).
 

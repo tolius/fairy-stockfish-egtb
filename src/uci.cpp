@@ -350,28 +350,31 @@ void UCI::loop(int argc, char* argv[]) {
       else if (token == "ponderhit")
           Threads.main()->ponder = false; // Switch to normal search
 
-      else if (token == "uci" || token == "usi" || token == "ucci" || token == "xboard")
+      else if (token == "uci" || token == "usi" || token == "ucci" || token == "xboard" || token == "ucicyclone")
       {
-          CurrentProtocol =  token == "uci"  ? UCI_GENERAL
+          CurrentProtocol =  token == "uci"  ? (CurrentProtocol == UCI_CYCLONE ? UCI_CYCLONE : UCI_GENERAL)
+                           : token == "ucicyclone" ? UCI_CYCLONE
                            : token == "usi"  ? USI
                            : token == "ucci" ? UCCI
                            : XBOARD;
           string defaultVariant = string(
 #ifdef LARGEBOARDS
                                            CurrentProtocol == USI  ? "shogi"
-                                         : CurrentProtocol == UCCI ? "xiangqi"
+                                         : CurrentProtocol == UCCI || CurrentProtocol == UCI_CYCLONE ? "xiangqi"
 #else
                                            CurrentProtocol == USI  ? "minishogi"
-                                         : CurrentProtocol == UCCI ? "minixiangqi"
+                                         : CurrentProtocol == UCCI || CurrentProtocol == UCI_CYCLONE ? "minixiangqi"
 #endif
                                                            : "chess");
           Options["UCI_Variant"].set_default(defaultVariant);
           std::istringstream ss("startpos");
           position(pos, ss, states);
-          if (is_uci_dialect(CurrentProtocol))
+          if (is_uci_dialect(CurrentProtocol) && token != "ucicyclone")
               sync_cout << "id name " << engine_info(true)
                           << "\n" << Options
                           << "\n" << token << "ok"  << sync_endl;
+          // Allow to enforce protocol at startup
+          argc = i_start;
       }
 
       else if (CurrentProtocol == XBOARD)
@@ -539,7 +542,7 @@ string UCI::move(const Position& pos, Move m) {
                                     : UCI::square(pos, from)) + UCI::square(pos, to);
 
   // Wall square
-  if (pos.wall_gating() && CurrentProtocol == XBOARD)
+  if (pos.walling() && CurrentProtocol == XBOARD)
       move += "," + UCI::square(pos, to) + UCI::square(pos, gating_square(m));
 
   if (type_of(m) == PROMOTION)
@@ -556,7 +559,7 @@ string UCI::move(const Position& pos, Move m) {
   }
 
   // Wall square
-  if (pos.wall_gating() && CurrentProtocol != XBOARD)
+  if (pos.walling() && CurrentProtocol != XBOARD)
       move += "," + UCI::square(pos, to) + UCI::square(pos, gating_square(m));
 
   return move;

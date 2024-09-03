@@ -19,6 +19,7 @@
 #ifndef VARIANT_H_INCLUDED
 #define VARIANT_H_INCLUDED
 
+#include <bitset>
 #include <set>
 #include <map>
 #include <vector>
@@ -44,14 +45,17 @@ struct Variant {
   bool twoBoards = false;
   int pieceValue[PHASE_NB][PIECE_TYPE_NB] = {};
   std::string customPiece[CUSTOM_PIECES_NB] = {};
-  std::set<PieceType> pieceTypes = { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING };
+  PieceSet pieceTypes = CHESS_PIECES;
   std::string pieceToChar =  " PNBRQ" + std::string(KING - QUEEN - 1, ' ') + "K" + std::string(PIECE_TYPE_NB - KING - 1, ' ')
                            + " pnbrq" + std::string(KING - QUEEN - 1, ' ') + "k" + std::string(PIECE_TYPE_NB - KING - 1, ' ');
   std::string pieceToCharSynonyms = std::string(PIECE_NB, ' ');
   std::string startFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
   Bitboard mobilityRegion[COLOR_NB][PIECE_TYPE_NB] = {};
-  Rank promotionRank = RANK_8;
-  std::set<PieceType, std::greater<PieceType> > promotionPieceTypes = { QUEEN, ROOK, BISHOP, KNIGHT };
+  Bitboard promotionRegion[COLOR_NB] = {Rank8BB, Rank1BB};
+  PieceType promotionPawnType[COLOR_NB] = {PAWN, PAWN};
+  PieceSet promotionPawnTypes[COLOR_NB] = {piece_set(PAWN), piece_set(PAWN)};
+  PieceSet promotionPieceTypes[COLOR_NB] = {piece_set(QUEEN) | ROOK | BISHOP | KNIGHT,
+                                            piece_set(QUEEN) | ROOK | BISHOP | KNIGHT};
   bool sittuyinPromotion = false;
   int promotionLimit[PIECE_TYPE_NB] = {}; // 0 means unlimited
   PieceType promotedPieceType[PIECE_TYPE_NB] = {};
@@ -60,19 +64,26 @@ struct Variant {
   bool mandatoryPiecePromotion = false;
   bool pieceDemotion = false;
   bool blastOnCapture = false;
-  bool petrifyOnCapture = false;
+  PieceSet blastImmuneTypes = NO_PIECE_SET;
+  PieceSet mutuallyImmuneTypes = NO_PIECE_SET;
+  PieceSet petrifyOnCaptureTypes = NO_PIECE_SET;
+  bool petrifyBlastPieces = false;
   bool doubleStep = true;
-  Rank doubleStepRank = RANK_2;
-  Rank doubleStepRankMin = RANK_2;
+  Bitboard doubleStepRegion[COLOR_NB] = {Rank2BB, Rank7BB};
+  Bitboard tripleStepRegion[COLOR_NB] = {};
   Bitboard enPassantRegion = AllSquares;
+  PieceSet enPassantTypes[COLOR_NB] = {piece_set(PAWN), piece_set(PAWN)};
   bool castling = true;
   bool castlingDroppedPiece = false;
   File castlingKingsideFile = FILE_G;
   File castlingQueensideFile = FILE_C;
   Rank castlingRank = RANK_1;
   File castlingKingFile = FILE_E;
-  PieceType castlingKingPiece = KING;
-  PieceType castlingRookPiece = ROOK;
+  PieceType castlingKingPiece[COLOR_NB] = {KING, KING};
+  File castlingRookKingsideFile = FILE_MAX; // only has to match if rook is not in corner in non-960 variants
+  File castlingRookQueensideFile = FILE_A; // only has to match if rook is not in corner in non-960 variants
+  PieceSet castlingRookPieces[COLOR_NB] = {piece_set(ROOK), piece_set(ROOK)};
+  bool oppositeCastling = false;
   PieceType kingType = KING;
   bool checking = true;
   bool dropChecks = true;
@@ -84,7 +95,6 @@ struct Variant {
   bool capturesToHand = false;
   bool firstRankPawnDrops = false;
   bool promotionZonePawnDrops = false;
-  bool dropOnTop = false;
   EnclosingRule enclosingDrop = NO_ENCLOSING;
   Bitboard enclosingDropStart = 0;
   Bitboard whiteDropRegion = AllSquares;
@@ -96,16 +106,14 @@ struct Variant {
   int dropNoDoubledCount = 1;
   bool immobilityIllegal = false;
   bool gating = false;
-  bool arrowGating = false;
-  bool duckGating = false;
-  bool staticGating = false;
-  bool pastGating = false;
-  Bitboard staticGatingRegion = AllSquares;
+  WallingRule wallingRule = NO_WALLING;
+  Bitboard wallingRegion[COLOR_NB] = {AllSquares, AllSquares};
+  bool wallOrMove = false;
   bool seirawanGating = false;
   bool cambodianMoves = false;
   Bitboard diagonalLines = 0;
-  bool pass = false;
-  bool passOnStalemate = false;
+  bool pass[COLOR_NB] = {false, false};
+  bool passOnStalemate[COLOR_NB] = {false, false};
   bool makpongRule = false;
   bool flyingGeneral = false;
   Rank soldierPromotionRank = RANK_1;
@@ -113,6 +121,7 @@ struct Variant {
   bool freeDrops = false;
 
   // game end
+  PieceSet nMoveRuleTypes[COLOR_NB] = {piece_set(PAWN), piece_set(PAWN)};
   int nMoveRule = 50;
   int nFoldRule = 3;
   Value nFoldValue = VALUE_DRAW;
@@ -129,17 +138,31 @@ struct Variant {
   Value extinctionValue = VALUE_NONE;
   bool extinctionClaim = false;
   bool extinctionPseudoRoyal = false;
-  std::set<PieceType> extinctionPieceTypes = {};
+  bool dupleCheck = false;
+  PieceSet extinctionPieceTypes = NO_PIECE_SET;
   int extinctionPieceCount = 0;
   int extinctionOpponentPieceCount = 0;
-  PieceType flagPiece = NO_PIECE_TYPE;
-  Bitboard whiteFlag = 0;
-  Bitboard blackFlag = 0;
+  PieceType flagPiece[COLOR_NB] = {ALL_PIECES, ALL_PIECES};
+  Bitboard flagRegion[COLOR_NB] = {};
+  int flagPieceCount = 1;
+  bool flagPieceBlockedWin = false;
   bool flagMove = false;
+  bool flagPieceSafe = false;
   bool checkCounting = false;
   int connectN = 0;
+  PieceSet connectPieceTypes = ~NO_PIECE_SET;
+  bool connectHorizontal = true;
+  bool connectVertical = true;
+  bool connectDiagonal = true;
+  Bitboard connectRegion1[COLOR_NB] = {};
+  Bitboard connectRegion2[COLOR_NB] = {};
+  int connectNxN = 0;
+  int collinearN = 0;
+  Value connectValue = VALUE_MATE;
   MaterialCounting materialCounting = NO_MATERIAL_COUNTING;
+  bool adjudicateFullBoard = false;
   CountingRule countingRule = NO_COUNTING;
+  CastlingRights castlingWins = NO_CASTLING;
 
   // Derived properties
   bool fastAttacks = true;
@@ -152,15 +175,21 @@ struct Variant {
   int pieceHandIndex[COLOR_NB][PIECE_NB];
   int kingSquareIndex[SQUARE_NB];
   int nnueMaxPieces;
-  bool endgameEval = false;
+  EndgameEval endgameEval = EG_EVAL_CHESS;
   bool shogiStylePromotions = false;
-
+  std::vector<Direction> connect_directions;
+  PieceSet connectPieceTypesTrimmed = ~NO_PIECE_SET;
   void add_piece(PieceType pt, char c, std::string betza = "", char c2 = ' ') {
+      // Avoid ambiguous definition by removing existing piece with same letter
+      size_t idx;
+      if ((idx = pieceToChar.find(toupper(c))) != std::string::npos)
+          remove_piece(PieceType(idx));
+      // Now add new piece
       pieceToChar[make_piece(WHITE, pt)] = toupper(c);
       pieceToChar[make_piece(BLACK, pt)] = tolower(c);
       pieceToCharSynonyms[make_piece(WHITE, pt)] = toupper(c2);
       pieceToCharSynonyms[make_piece(BLACK, pt)] = tolower(c2);
-      pieceTypes.insert(pt);
+      pieceTypes |= pt;
       // Add betza notation for custom piece
       if (is_custom(pt))
           customPiece[pt - CUSTOM_PIECES] = betza;
@@ -175,136 +204,29 @@ struct Variant {
       pieceToChar[make_piece(BLACK, pt)] = ' ';
       pieceToCharSynonyms[make_piece(WHITE, pt)] = ' ';
       pieceToCharSynonyms[make_piece(BLACK, pt)] = ' ';
-      pieceTypes.erase(pt);
+      pieceTypes &= ~piece_set(pt);
+      // erase from promotion types to ensure consistency
+      promotionPieceTypes[WHITE] &= ~piece_set(pt);
+      promotionPieceTypes[BLACK] &= ~piece_set(pt);
   }
 
   void reset_pieces() {
       pieceToChar = std::string(PIECE_NB, ' ');
       pieceToCharSynonyms = std::string(PIECE_NB, ' ');
-      pieceTypes.clear();
+      pieceTypes = NO_PIECE_SET;
+      // clear promotion types to ensure consistency
+      promotionPieceTypes[WHITE] = NO_PIECE_SET;
+      promotionPieceTypes[BLACK] = NO_PIECE_SET;
   }
 
   // Reset values that always need to be redefined
   Variant* init() {
       nnueAlias = "";
+      endgameEval = EG_EVAL_CHESS;
       return this;
   }
 
-  // Pre-calculate derived properties
-  Variant* conclude() {
-      fastAttacks = std::all_of(pieceTypes.begin(), pieceTypes.end(), [this](PieceType pt) {
-                                    return (   pt < FAIRY_PIECES
-                                            || pt == COMMONER || pt == IMMOBILE_PIECE
-                                            || pt == ARCHBISHOP || pt == CHANCELLOR
-                                            || (pt == KING && kingType == KING))
-                                          && !(mobilityRegion[WHITE][pt] || mobilityRegion[BLACK][pt]);
-                                })
-                    && !cambodianMoves
-                    && !diagonalLines;
-      fastAttacks2 = std::all_of(pieceTypes.begin(), pieceTypes.end(), [this](PieceType pt) {
-                                    return (   pt < FAIRY_PIECES
-                                            || pt == COMMONER || pt == FERS || pt == WAZIR || pt == BREAKTHROUGH_PIECE
-                                            || pt == SHOGI_PAWN || pt == GOLD || pt == SILVER || pt == SHOGI_KNIGHT
-                                            || pt == DRAGON || pt == DRAGON_HORSE || pt == LANCE
-                                            || (pt == KING && kingType == KING))
-                                          && !(mobilityRegion[WHITE][pt] || mobilityRegion[BLACK][pt]);
-                                })
-                    && !cambodianMoves
-                    && !diagonalLines;
-
-      // Initialize calculated NNUE properties
-      nnueKing =  pieceTypes.find(KING) != pieceTypes.end() ? KING
-                : extinctionPieceCount == 0 && extinctionPieceTypes.find(COMMONER) != extinctionPieceTypes.end() ? COMMONER
-                : NO_PIECE_TYPE;
-      if (nnueKing != NO_PIECE_TYPE)
-      {
-          std::string fenBoard = startFen.substr(0, startFen.find(' '));
-          // Switch NNUE from KA to A if there is no unique piece
-          if (   std::count(fenBoard.begin(), fenBoard.end(), pieceToChar[make_piece(WHITE, nnueKing)]) != 1
-              || std::count(fenBoard.begin(), fenBoard.end(), pieceToChar[make_piece(BLACK, nnueKing)]) != 1)
-              nnueKing = NO_PIECE_TYPE;
-      }
-      int nnueSquares = (maxRank + 1) * (maxFile + 1);
-      nnueUsePockets = (pieceDrops && (capturesToHand || (!mustDrop && pieceTypes.size() != 1))) || seirawanGating;
-      int nnuePockets = nnueUsePockets ? 2 * int(maxFile + 1) : 0;
-      int nnueNonDropPieceIndices = (2 * pieceTypes.size() - (nnueKing != NO_PIECE_TYPE)) * nnueSquares;
-      int nnuePieceIndices = nnueNonDropPieceIndices + 2 * (pieceTypes.size() - (nnueKing != NO_PIECE_TYPE)) * nnuePockets;
-      int i = 0;
-      for (PieceType pt : pieceTypes)
-      {
-          for (Color c : { WHITE, BLACK})
-          {
-              pieceSquareIndex[c][make_piece(c, pt)] = 2 * i * nnueSquares;
-              pieceSquareIndex[c][make_piece(~c, pt)] = (2 * i + (pt != nnueKing)) * nnueSquares;
-              pieceHandIndex[c][make_piece(c, pt)] = 2 * i * nnuePockets + nnueNonDropPieceIndices;
-              pieceHandIndex[c][make_piece(~c, pt)] = (2 * i + 1) * nnuePockets + nnueNonDropPieceIndices;
-          }
-          i++;
-      }
-
-      // Map king squares to enumeration of actually available squares.
-      // E.g., for xiangqi map from 0-89 to 0-8.
-      // Variants might be initialized before bitboards, so do not rely on precomputed bitboards (like SquareBB).
-      // Furthermore conclude() might be called on invalid configuration during validation,
-      // therefore skip proper initialization in case of invalid board size.
-      int nnueKingSquare = 0;
-      if (nnueKing && nnueSquares <= SQUARE_NB)
-          for (Square s = SQ_A1; s < nnueSquares; ++s)
-          {
-              Square bitboardSquare = Square(s + s / (maxFile + 1) * (FILE_MAX - maxFile));
-              if (   !mobilityRegion[WHITE][nnueKing] || !mobilityRegion[BLACK][nnueKing]
-                  || (mobilityRegion[WHITE][nnueKing] & make_bitboard(bitboardSquare))
-                  || (mobilityRegion[BLACK][nnueKing] & make_bitboard(relative_square(BLACK, bitboardSquare, maxRank))))
-              {
-                  kingSquareIndex[s] = nnueKingSquare++ * nnuePieceIndices;
-              }
-          }
-      else
-          kingSquareIndex[SQ_A1] = nnueKingSquare++ * nnuePieceIndices;
-      nnueDimensions = nnueKingSquare * nnuePieceIndices;
-
-      // Determine maximum piece count
-      std::istringstream ss(startFen);
-      ss >> std::noskipws;
-      unsigned char token;
-      nnueMaxPieces = 0;
-      while ((ss >> token) && !isspace(token))
-      {
-          if (pieceToChar.find(token) != std::string::npos || pieceToCharSynonyms.find(token) != std::string::npos)
-              nnueMaxPieces++;
-      }
-      if (twoBoards)
-          nnueMaxPieces *= 2;
-
-      // For endgame evaluation to be applicable, no special win rules must apply.
-      // Furthermore, rules significantly changing game mechanics also invalidate it.
-      endgameEval = std::none_of(pieceTypes.begin(), pieceTypes.end(), [this](PieceType pt) {
-                                    return mobilityRegion[WHITE][pt] || mobilityRegion[BLACK][pt];
-                                })
-                    && extinctionValue == VALUE_NONE
-                    && checkmateValue == -VALUE_MATE
-                    && stalemateValue == VALUE_DRAW
-                    && !materialCounting
-                    && !flagPiece
-                    && !mustCapture
-                    && !checkCounting
-                    && !makpongRule
-                    && !connectN
-                    && !blastOnCapture
-                    && !capturesToHand
-                    && !twoBoards
-                    && kingType == KING;
-    
-      shogiStylePromotions = false;
-      for (PieceType current: promotedPieceType)
-          if (current != NO_PIECE_TYPE)
-          {
-              shogiStylePromotions = true;
-              break;
-          }
-
-      return this;
-  }
+  Variant* conclude();
 };
 
 class VariantMap : public std::map<std::string, const Variant*> {

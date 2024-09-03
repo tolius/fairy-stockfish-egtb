@@ -68,9 +68,10 @@ string board_to_name(const Position& pos)
 
 bool is_ep_position(const Position& pos)
 {
-	auto ep_square = pos.ep_square();
-	if (ep_square == SQ_NONE)
+	auto ep_squares = pos.ep_squares();
+	if (!ep_squares)
 		return false;
+	auto ep_square = pop_lsb(ep_squares);
 	Color ep_color = (pos.side_to_move() == WHITE) ? BLACK : WHITE;
 	Square final_square = SQ_NONE;
 	if (ep_color == WHITE)

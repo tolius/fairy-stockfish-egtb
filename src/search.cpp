@@ -81,7 +81,7 @@ namespace {
   }
 
   int futility_move_count(bool improving, Depth depth, const Position& pos) {
-    return (3 + depth * depth * (1 + pos.wall_gating()) + 2 * pos.blast_on_capture()) / (2 - improving + pos.blast_on_capture());
+    return (3 + depth * depth * (1 + pos.walling()) + 2 * pos.blast_on_capture()) / (2 - improving + pos.blast_on_capture());
   }
 
   // History and stats update bonus, based on depth
@@ -282,7 +282,7 @@ void MainThread::search() {
       if (!Limits.infinite && !ponder && rootMoves[0].pv[0] != MOVE_NONE && !Threads.abort.exchange(true))
       {
           std::string move = UCI::move(rootPos, bestMove);
-          if (rootPos.wall_gating())
+          if (rootPos.walling())
           {
               sync_cout << "move " << move.substr(0, move.find(",")) << "," << sync_endl;
               sync_cout << "move " << move.substr(move.find(",") + 1) << sync_endl;
@@ -803,7 +803,7 @@ namespace {
             {
                 int penalty = -stat_bonus(depth);
                 thisThread->mainHistory[us][from_to(ttMove)] << penalty;
-                if (pos.wall_gating())
+                if (pos.walling())
                     thisThread->gateHistory[us][gating_square(ttMove)] << penalty;
                 update_continuation_histories(ss, pos.moved_piece(ttMove), to_sq(ttMove), penalty);
             }
@@ -977,7 +977,7 @@ namespace {
         && (ss-1)->statScore < 23767
         &&  eval >= beta
         &&  eval >= ss->staticEval
-        &&  ss->staticEval >= beta - 20 * depth - 22 * improving + 168 * ss->ttPv + 159 + 200 * (!pos.double_step_enabled() && pos.piece_to_char()[PAWN] != ' ')
+        &&  ss->staticEval >= beta - 20 * depth - 22 * improving + 168 * ss->ttPv + 159 + 200 * (!pos.double_step_region(pos.side_to_move()) && (pos.piece_types() & PAWN))
         && !excludedMove
         &&  pos.non_pawn_material(us)
         &&  pos.count<ALL_PIECES>(~us) != pos.count<PAWN>(~us)
@@ -1023,7 +1023,7 @@ namespace {
         }
     }
 
-    probCutBeta = beta + (209 + 20 * !!pos.capture_the_flag_piece() + 50 * pos.captures_to_hand()) * (1 + pos.check_counting() + pos.extinction_single_piece()) - 44 * improving;
+    probCutBeta = beta + (209 + 20 * !!pos.flag_region(~pos.side_to_move()) + 50 * pos.captures_to_hand()) * (1 + pos.check_counting() + pos.extinction_single_piece()) - 44 * improving;
 
     // Step 9. ProbCut (~4 Elo)
     // If we have a good enough capture and a reduced search returns a value
@@ -1226,7 +1226,7 @@ moves_loop: // When in check, search starts from here
                   continue;
 
               // Prune moves with negative SEE (~20 Elo)
-              if (!pos.variant()->duckGating && !pos.see_ge(move, Value(-(30 - std::min(lmrDepth, 18) + 10 * !!pos.capture_the_flag_piece()) * lmrDepth * lmrDepth)))
+              if (!(pos.walling_rule() == DUCK) && !pos.see_ge(move, Value(-(30 - std::min(lmrDepth, 18) + 10 * !!pos.flag_region(pos.side_to_move())) * lmrDepth * lmrDepth)))
                   continue;
           }
       }
@@ -1687,7 +1687,7 @@ moves_loop: // When in check, search starts from here
           && !givesCheck
           && !(   pos.extinction_value() == -VALUE_MATE
                && pos.piece_on(to_sq(move))
-               && pos.extinction_piece_types().find(type_of(pos.piece_on(to_sq(move)))) != pos.extinction_piece_types().end())
+               && (pos.extinction_piece_types() & type_of(pos.piece_on(to_sq(move)))))
           &&  futilityBase > -VALUE_KNOWN_WIN
           &&  type_of(move) != PROMOTION)
       {
@@ -1864,9 +1864,9 @@ moves_loop: // When in check, search starts from here
         // Decrease stats for all non-best quiet moves
         for (int i = 0; i < quietCount; ++i)
         {
-            if (!(pos.wall_gating() && from_to(quietsSearched[i]) == from_to(bestMove)))
+            if (!(pos.walling() && from_to(quietsSearched[i]) == from_to(bestMove)))
                 thisThread->mainHistory[us][from_to(quietsSearched[i])] << -bonus2;
-            if (pos.wall_gating())
+            if (pos.walling())
                 thisThread->gateHistory[us][gating_square(quietsSearched[i])] << -bonus2;
             update_continuation_histories(ss, pos.moved_piece(quietsSearched[i]), to_sq(quietsSearched[i]), -bonus2);
         }
@@ -1875,7 +1875,7 @@ moves_loop: // When in check, search starts from here
     {
         // Increase stats for the best move in case it was a capture move
         captureHistory[moved_piece][to_sq(bestMove)][captured] << bonus1;
-        if (pos.wall_gating())
+        if (pos.walling())
             thisThread->gateHistory[us][gating_square(bestMove)] << bonus1;
     }
 
@@ -1890,9 +1890,9 @@ moves_loop: // When in check, search starts from here
     {
         moved_piece = pos.moved_piece(capturesSearched[i]);
         captured = type_of(pos.piece_on(to_sq(capturesSearched[i])));
-        if (!(pos.wall_gating() && from_to(capturesSearched[i]) == from_to(bestMove)))
+        if (!(pos.walling() && from_to(capturesSearched[i]) == from_to(bestMove)))
             captureHistory[moved_piece][to_sq(capturesSearched[i])][captured] << -bonus1;
-        if (pos.wall_gating())
+        if (pos.walling())
             thisThread->gateHistory[us][gating_square(capturesSearched[i])] << -bonus1;
     }
   }
@@ -1928,7 +1928,7 @@ moves_loop: // When in check, search starts from here
     Color us = pos.side_to_move();
     Thread* thisThread = pos.this_thread();
     thisThread->mainHistory[us][from_to(move)] << bonus;
-    if (pos.wall_gating())
+    if (pos.walling())
         thisThread->gateHistory[us][gating_square(move)] << bonus;
     update_continuation_histories(ss, pos.moved_piece(move), to_sq(move), bonus);
 
@@ -2027,78 +2027,78 @@ void MainThread::check_time() {
 
 string UCI::pv(const Position& pos, Depth depth, Value alpha, Value beta) {
 
-    std::stringstream ss;
-    TimePoint elapsed = Time.elapsed() + 1;
-    const RootMoves& rootMoves = pos.this_thread()->rootMoves;
-    size_t pvIdx = pos.this_thread()->pvIdx;
-    size_t multiPV = std::min((size_t)Options["MultiPV"], rootMoves.size());
-    uint64_t nodesSearched = Threads.nodes_searched();
-    uint64_t tbHits = Threads.tb_hits() + (TB::RootInTB ? rootMoves.size() : 0);
+  std::stringstream ss;
+  TimePoint elapsed = Time.elapsed() + 1;
+  const RootMoves& rootMoves = pos.this_thread()->rootMoves;
+  size_t pvIdx = pos.this_thread()->pvIdx;
+  size_t multiPV = std::min((size_t)Options["MultiPV"], rootMoves.size());
+  uint64_t nodesSearched = Threads.nodes_searched();
+  uint64_t tbHits = Threads.tb_hits() + (TB::RootInTB ? rootMoves.size() : 0);
 
-    for (size_t i = 0; i < multiPV; ++i)
-    {
-        bool updated = rootMoves[i].score != -VALUE_INFINITE;
+  for (size_t i = 0; i < multiPV; ++i)
+  {
+      bool updated = rootMoves[i].score != -VALUE_INFINITE;
 
-        if (depth == 1 && !updated && i > 0)
-            continue;
+      if (depth == 1 && !updated && i > 0)
+          continue;
 
-        Depth d = updated ? depth : std::max(1, depth - 1);
-        Value v = updated ? rootMoves[i].score : rootMoves[i].previousScore;
+      Depth d = updated ? depth : std::max(1, depth - 1);
+      Value v = updated ? rootMoves[i].score : rootMoves[i].previousScore;
 
-        if (v == -VALUE_INFINITE)
-            v = VALUE_ZERO;
+      if (v == -VALUE_INFINITE)
+          v = VALUE_ZERO;
 
-        bool tb = TB::RootInTB && abs(v) < VALUE_MATE_IN_MAX_PLY;
-        v = tb ? rootMoves[i].tbScore : v;
+      bool tb = TB::RootInTB && abs(v) < VALUE_MATE_IN_MAX_PLY;
+      v = tb ? rootMoves[i].tbScore : v;
 
-        if (ss.rdbuf()->in_avail()) // Not at first line
-            ss << "\n";
+      if (ss.rdbuf()->in_avail()) // Not at first line
+          ss << "\n";
 
-        if (CurrentProtocol == XBOARD)
-        {
-            ss << d << " "
-                << UCI::value(v) << " "
-                << elapsed / 10 << " "
-                << nodesSearched << " "
-                << rootMoves[i].selDepth << " "
-                << nodesSearched * 1000 / elapsed << " "
-                << tbHits << "\t";
+      if (CurrentProtocol == XBOARD)
+      {
+          ss << d << " "
+             << UCI::value(v) << " "
+             << elapsed / 10 << " "
+             << nodesSearched << " "
+             << rootMoves[i].selDepth << " "
+             << nodesSearched * 1000 / elapsed << " "
+             << tbHits << "\t";
 
-            // Do not print PVs with virtual drops in bughouse variants
-            if (!pos.two_boards())
-                for (Move m : rootMoves[i].pv)
-                    ss << " " << UCI::move(pos, m);
-        }
-        else
-        {
-            ss << "info"
-                << " depth " << d
-                << " seldepth " << rootMoves[i].selDepth
-                << " multipv " << i + 1
-                << " score " << UCI::value(v);
+          // Do not print PVs with virtual drops in bughouse variants
+          if (!pos.two_boards())
+              for (Move m : rootMoves[i].pv)
+                  ss << " " << UCI::move(pos, m);
+      }
+      else
+      {
+      ss << "info"
+         << " depth "    << d
+         << " seldepth " << rootMoves[i].selDepth
+         << " multipv "  << i + 1
+         << " score "    << UCI::value(v);
 
-            if (Options["UCI_ShowWDL"])
-                ss << UCI::wdl(v, pos.game_ply());
+      if (Options["UCI_ShowWDL"])
+          ss << UCI::wdl(v, pos.game_ply());
 
-            if (!tb && i == pvIdx)
-                ss << (v >= beta ? " lowerbound" : v <= alpha ? " upperbound" : "");
+      if (!tb && i == pvIdx)
+          ss << (v >= beta ? " lowerbound" : v <= alpha ? " upperbound" : "");
 
-            ss << " nodes " << nodesSearched
-                << " nps " << nodesSearched * 1000 / elapsed;
+      ss << " nodes "    << nodesSearched
+         << " nps "      << nodesSearched * 1000 / elapsed;
 
-            if (elapsed > 1000) // Earlier makes little sense
-                ss << " hashfull " << TT.hashfull();
+      if (elapsed > 1000) // Earlier makes little sense
+          ss << " hashfull " << TT.hashfull();
 
-            ss << " tbhits " << tbHits
-                << " time " << elapsed
-                << " pv";
+      ss << " tbhits "   << tbHits
+         << " time "     << elapsed
+         << " pv";
 
-            for (Move m : rootMoves[i].pv)
-                ss << " " << UCI::move(pos, m);
-        }
-    }
+      for (Move m : rootMoves[i].pv)
+          ss << " " << UCI::move(pos, m);
+      }
+  }
 
-    return ss.str();
+  return ss.str();
 }
 
 

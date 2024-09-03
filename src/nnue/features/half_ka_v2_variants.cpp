@@ -32,7 +32,7 @@ namespace Stockfish::Eval::NNUE::Features {
   // Orient a square according to perspective (rotates by 180 for black)
   // Missing kings map to index 0 (SQ_A1)
   inline Square HalfKAv2Variants::orient(Color perspective, Square s, const Position& pos) {
-    return s != SQ_NONE ? to_variant_square(  perspective == WHITE || (pos.capture_the_flag(BLACK) & Rank8BB) ? s
+    return s != SQ_NONE ? to_variant_square(  perspective == WHITE || (pos.flag_region(BLACK) & Rank8BB) ? s
                                             : flip_rank(s, pos.max_rank()), pos) : SQ_A1;
   }
 
@@ -63,9 +63,12 @@ namespace Stockfish::Eval::NNUE::Features {
     // Indices for pieces in hand
     if (pos.nnue_use_pockets())
       for (Color c : {WHITE, BLACK})
-          for (PieceType pt : pos.piece_types())
+          for (PieceSet ps = pos.piece_types(); ps;)
+          {
+              PieceType pt = pop_lsb(ps);
               for (int i = 0; i < pos.count_in_hand(c, pt); i++)
                   active.push_back(make_index(perspective, i, make_piece(c, pt), oriented_ksq, pos));
+          }
 
   }
 
